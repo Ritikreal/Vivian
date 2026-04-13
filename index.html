@@ -551,67 +551,176 @@ function calculateRSI(prices, period = 14) {
 }
 
 async function analyzeStock() {
-  const stock = document.getElementById("stockInput").value;
+  const stock = document.getElementById("stockInput").value.trim();
   const mode = document.getElementById("mode").value;
   if (!stock) return;
 
   saveHistory(stock);
 
-  const interval = mode === 'scalp' ? '5m' : '1d';
+  // Show result card in loading state
+  const resultEl = document.getElementById("result");
+  resultEl.style.display = 'block';
+  document.getElementById("stockName").innerText = stock.toUpperCase();
+  document.getElementById("price").innerText = "Analyzing...";
+  const sigEl = document.getElementById("signal");
+  sigEl.innerText = "⏳ LOADING";
+  sigEl.className = "signal-hold";
+  document.getElementById("reason").innerText = "Fetching AI analysis, please wait...";
+
+  // Destroy old chart if any
+  if (chart) { chart.destroy(); chart = null; }
+
+  const modeLabel = mode === 'scalp' ? 'intraday scalping (1-min & 5-min charts)' : 'long-term swing/investment';
+
+  const analysisPrompt = `Analyze the stock "${stock}" for ${modeLabel}.
+
+Respond ONLY with a valid JSON object — no markdown, no extra text — in this exact structure:
+{
+  "signal": "BUY" or "SELL" or "HOLD",
+  "price": <estimated current price as a number>,
+  "summary": "<one line reason for the signal>",
+  "trend": "<UP / DOWN / SIDEWAYS>",
+  "resistance": <number>,
+  "support": <number>,
+  "ema_status": "<Bullish cross / Bearish cross / Flat>",
+  "rsi": <number between 0-100>,
+  "entry": <number>,
+  "sl": <number>,
+  "target": <number>,
+  "logic": "<1-2 line trade logic>",
+  "confirmation": "<what confirmation is needed>",
+  "max_risk": "<max risk in ₹>",
+  "avoid_if": "<condition to avoid trade>",
+  "alt_scenario": "<if trade fails, what happens>"
+}
+
+Use realistic approximate prices for Indian markets (NSE/BSE). If it's a US stock, use USD. Be as accurate as possible based on recent known data.`;
+
   try {
-    const res = await fetch(proxy + `https://query1.finance.yahoo.com/v8/finance/chart/${stock}?interval=${interval}`);
-    const data = await res.json();
-    const prices = data.chart.result[0].indicators.quote[0].close.filter(p => p);
-    const currentPrice = prices[prices.length - 1];
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        system: "You are a professional stock market analyst. Always respond with only a valid raw JSON object. No markdown, no backticks, no explanation — just the JSON.",
+        messages: [{ role: "user", content: analysisPrompt }]
+      })
+    });
 
-    let signal = "HOLD", reason = "No clear signal", sigClass = "signal-hold";
+    const data = await response.json();
+    const rawText = data.content?.map(b => b.text || "").join("").trim();
 
-    if (mode === 'scalp') {
-      const ema9 = calculateEMA(prices.slice(-20), 9);
-      const ema21 = calculateEMA(prices.slice(-20), 21);
-      const rsi = calculateRSI(prices);
-      if (ema9 > ema21 && rsi > 50) { signal = "BUY ⚡"; reason = `EMA9 > EMA21 | RSI: ${rsi.toFixed(1)} — Momentum bullish`; sigClass = "signal-buy"; }
-      else if (ema9 < ema21 && rsi < 50) { signal = "SELL ⚠️"; reason = `EMA9 < EMA21 | RSI: ${rsi.toFixed(1)} — Momentum bearish`; sigClass = "signal-sell"; }
-    } else {
-      const avg = prices.slice(-50).reduce((a,b)=>a+b,0)/50;
-      if (currentPrice > avg) { signal = "BUY 📈"; reason = "Price above 50-period MA — Uptrend"; sigClass = "signal-buy"; }
-      else { signal = "SELL 📉"; reason = "Price below 50-period MA — Downtrend"; sigClass = "signal-sell"; }
+    let parsed;
+    try {
+      // Strip any accidental markdown fences
+      const clean = rawText.replace(/```json|```/g, "").trim();
+      parsed = JSON.parse(clean);
+    } catch(e) {
+      document.getElementById("price").innerText = "Parse error";
+      document.getElementById("reason").innerText = "AI returned unexpected format. Try again.";
+      return;
     }
 
-    document.getElementById("result").style.display = 'block';
+    const sig = parsed.signal || "HOLD";
+    const sigClass = sig === "BUY" ? "signal-buy" : sig === "SELL" ? "signal-sell" : "signal-hold";
+    const sigIcon = sig === "BUY" ? "BUY ⚡" : sig === "SELL" ? "SELL ⚠️" : "HOLD ⏸";
+
     document.getElementById("stockName").innerText = stock.toUpperCase();
-    document.getElementById("price").innerText = `₹${currentPrice.toFixed(2)}`;
-    const sigEl = document.getElementById("signal");
-    sigEl.innerText = signal;
-    sigEl.className = `signal-${sigClass}`;
-    document.getElementById("reason").innerText = reason;
+    document.getElementById("price").innerText = `₹${Number(parsed.price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+    sigEl.innerText = sigIcon;
+    sigEl.className = sigClass;
+
+    document.getElementById("reason").innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;margin-bottom:10px;">
+        <div>📊 Trend: <b style="color:var(--text)">${parsed.trend}</b></div>
+        <div>📈 EMA: <b style="color:var(--text)">${parsed.ema_status}</b></div>
+        <div>🔢 RSI: <b style="color:var(--text)">${parsed.rsi}</b></div>
+        <div>🎯 Entry: <b style="color:var(--accent)">₹${parsed.entry}</b></div>
+        <div>🛑 SL: <b style="color:var(--accent2)">₹${parsed.sl}</b></div>
+        <div>✅ Target: <b style="color:var(--accent)">₹${parsed.target}</b></div>
+        <div style="grid-column:1/-1">🧠 ${parsed.logic}</div>
+        <div style="grid-column:1/-1;color:var(--muted)">✋ Avoid if: ${parsed.avoid_if}</div>
+        <div style="grid-column:1/-1;color:var(--muted)">🔄 Alt: ${parsed.alt_scenario}</div>
+      </div>
+    `;
+
+    // Draw a simulated price chart using generated dummy candle data around the parsed price
+    const basePrice = Number(parsed.price);
+    const support = Number(parsed.support);
+    const resistance = Number(parsed.resistance);
+    const points = 60;
+    const simPrices = [];
+    let p = support + (resistance - support) * 0.4;
+    for (let i = 0; i < points; i++) {
+      p += (Math.random() - 0.48) * (basePrice * 0.003);
+      p = Math.max(support * 0.995, Math.min(resistance * 1.005, p));
+      simPrices.push(parseFloat(p.toFixed(2)));
+    }
+    // Push toward current price at end
+    simPrices.push(basePrice);
+
+    const borderColor = sigClass === 'signal-buy' ? '#00ff88' : sigClass === 'signal-sell' ? '#ff3c6e' : '#ffcf40';
+    const fillColor = sigClass === 'signal-buy' ? 'rgba(0,255,136,0.06)' : sigClass === 'signal-sell' ? 'rgba(255,60,110,0.06)' : 'rgba(255,207,64,0.06)';
 
     const ctx = document.getElementById("chart").getContext("2d");
-    if (chart) chart.destroy();
     chart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: prices.map((_, i) => i),
-        datasets: [{
-          data: prices,
-          borderColor: sigClass === 'signal-buy' ? '#00ff88' : sigClass === 'signal-sell' ? '#ff3c6e' : '#ffcf40',
-          borderWidth: 1.5,
-          pointRadius: 0,
-          fill: true,
-          backgroundColor: sigClass === 'signal-buy' ? 'rgba(0,255,136,0.05)' : sigClass === 'signal-sell' ? 'rgba(255,60,110,0.05)' : 'rgba(255,207,64,0.05)'
-        }]
+        labels: simPrices.map((_, i) => i),
+        datasets: [
+          {
+            data: simPrices,
+            borderColor: borderColor,
+            borderWidth: 1.5,
+            pointRadius: 0,
+            fill: true,
+            backgroundColor: fillColor,
+            tension: 0.3
+          },
+          {
+            data: Array(simPrices.length).fill(Number(parsed.sl)),
+            borderColor: 'rgba(255,60,110,0.5)',
+            borderWidth: 1,
+            borderDash: [4,4],
+            pointRadius: 0,
+            fill: false,
+            label: 'SL'
+          },
+          {
+            data: Array(simPrices.length).fill(Number(parsed.target)),
+            borderColor: 'rgba(0,255,136,0.5)',
+            borderWidth: 1,
+            borderDash: [4,4],
+            pointRadius: 0,
+            fill: false,
+            label: 'Target'
+          }
+        ]
       },
       options: {
         animation: false,
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: true, labels: { color: '#5a5a7a', font: { size: 10 }, boxWidth: 20 } }
+        },
         scales: {
           x: { display: false },
           y: { display: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#5a5a7a', font: { size: 10 } } }
         }
       }
     });
+
+    // Also open chatbot with full analysis
+    if (!chatOpen) toggleChat();
+    chatHistory.push({ role: "user", content: `Give me a full scalping analysis for ${stock}` });
+    appendMsg(`📊 AI Analysis loaded for ${stock.toUpperCase()}!\n\nSignal: ${sigIcon}\nEntry: ₹${parsed.entry} | SL: ₹${parsed.sl} | Target: ₹${parsed.target}\n\n${parsed.logic}\n\nConfirmation needed: ${parsed.confirmation}`, "bot");
+
   } catch(e) {
-    alert("Could not fetch data. Check the ticker symbol.");
+    console.error(e);
+    document.getElementById("price").innerText = "Error";
+    document.getElementById("reason").innerText = "Failed to fetch analysis. Check your connection and try again.";
+    sigEl.innerText = "ERROR";
+    sigEl.className = "signal-hold";
   }
 }
 
