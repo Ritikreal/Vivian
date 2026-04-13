@@ -4,9 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI Stock Assistant Pro</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 body { font-family: Arial, sans-serif; background:#000; color:#fff; margin:0; padding:20px; }
-.container { max-width:700px; margin:auto; }
+.container { max-width:800px; margin:auto; }
 h1 { font-size:28px; margin-bottom:20px; }
 input, button, select { width:100%; padding:12px; margin:10px 0; border:none; }
 input, select { background:#111; color:#fff; }
@@ -14,6 +15,8 @@ button { background:#fff; color:#000; cursor:pointer; }
 .card { border:1px solid #333; padding:15px; margin-top:20px; }
 .small { color:#aaa; font-size:14px; }
 .badge { font-weight:bold; }
+canvas { background:#111; margin-top:10px; }
+li { cursor:pointer; }
 </style>
 </head>
 <body>
@@ -34,10 +37,40 @@ button { background:#fff; color:#000; cursor:pointer; }
 <p id="price"></p>
 <p id="signal" class="badge"></p>
 <p class="small" id="reason"></p>
+<canvas id="chart" height="200"></canvas>
 </div>
+
+<div class="card">
+<h3>Suggested Stocks</h3>
+<ul>
+<li onclick="quickFill('RELIANCE.NS')">RELIANCE.NS</li>
+<li onclick="quickFill('TCS.NS')">TCS.NS</li>
+<li onclick="quickFill('INFY.NS')">INFY.NS</li>
+<li onclick="quickFill('HDFCBANK.NS')">HDFCBANK.NS</li>
+<li onclick="quickFill('ICICIBANK.NS')">ICICIBANK.NS</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>Stocks I Would Watch / Invest</h3>
+<ul id="watchlist">
+<li>RELIANCE.NS (Strong Trend)</li>
+<li>HDFCBANK.NS (Stable)</li>
+<li>INFY.NS (Tech Momentum)</li>
+</ul>
+<p class="small">These are generally strong stocks for consistency</p>
+</div>
+
 </div>
 
 <script>
+let chart;
+
+function quickFill(stock) {
+    document.getElementById('stockInput').value = stock;
+    analyzeStock();
+}
+
 function calculateEMA(prices, period) {
     let k = 2 / (period + 1);
     let ema = prices[0];
@@ -103,6 +136,28 @@ async function analyzeStock() {
     document.getElementById('price').innerText = `Price: ${currentPrice.toFixed(2)}`;
     document.getElementById('signal').innerText = `Signal: ${signal}`;
     document.getElementById('reason').innerText = reason;
+
+    // Chart
+    const ctx = document.getElementById('chart').getContext('2d');
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: prices.map((_, i) => i),
+            datasets: [{
+                label: stock,
+                data: prices,
+                borderColor: 'white',
+                borderWidth: 1,
+                pointRadius: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { x: { display: false }, y: { display: true } }
+        }
+    });
 }
 </script>
 </body>
