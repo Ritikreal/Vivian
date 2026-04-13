@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Stock Assistant Pro</title>
+<style>
+body { font-family: Arial, sans-serif; background:#000; color:#fff; margin:0; padding:20px; }
+.container { max-width:700px; margin:auto; }
+h1 { font-size:28px; margin-bottom:20px; }
+input, button, select { width:100%; padding:12px; margin:10px 0; border:none; }
+input, select { background:#111; color:#fff; }
+button { background:#fff; color:#000; cursor:pointer; }
+.card { border:1px solid #333; padding:15px; margin-top:20px; }
+.small { color:#aaa; font-size:14px; }
+.badge { font-weight:bold; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>AI Stock Assistant Pro</h1>
+
+<input type="text" id="stockInput" placeholder="Enter stock (e.g. RELIANCE.NS)">
+
+<select id="mode">
+<option value="scalp">Scalping (5min)</option>
+<option value="swing">Long Term (50MA)</option>
+</select>
+
+<button onclick="analyzeStock()">Analyze</button>
+
+<div id="result" class="card" style="display:none;">
+<h2 id="stockName"></h2>
+<p id="price"></p>
+<p id="signal" class="badge"></p>
+<p class="small" id="reason"></p>
+</div>
+</div>
+
+<script>
+function calculateEMA(prices, period) {
+    let k = 2 / (period + 1);
+    let ema = prices[0];
+    for (let i = 1; i < prices.length; i++) {
+        ema = prices[i] * k + ema * (1 - k);
+    }
+    return ema;
+}
+
+function calculateRSI(prices, period = 14) {
+    let gains = 0, losses = 0;
+    for (let i = prices.length - period; i < prices.length - 1; i++) {
+        let diff = prices[i+1] - prices[i];
+        if (diff >= 0) gains += diff;
+        else losses -= diff;
+    }
+    let rs = gains / (losses || 1);
+    return 100 - (100 / (1 + rs));
+}
+
+async function analyzeStock() {
+    const stock = document.getElementById('stockInput').value;
+    const mode = document.getElementById('mode').value;
+    if (!stock) return;
+
+    const interval = mode === 'scalp' ? '5m' : '1d';
+
+    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${stock}?interval=${interval}`);
+    const data = await res.json();
+
+    const prices = data.chart.result[0].indicators.quote[0].close.filter(p => p);
+    const currentPrice = prices[prices.length - 1];
+
+    let signal = "HOLD";
+    let reason = "No clear signal";
+
+    if (mode === 'scalp') {
+        const ema9 = calculateEMA(prices.slice(-20), 9);
+        const ema21 = calculateEMA(prices.slice(-20), 21);
+        const rsi = calculateRSI(prices);
+
+        if (ema9 > ema21 && rsi > 50) {
+            signal = "BUY ⚡";
+            reason = "EMA crossover + RSI bullish";
+        } else if (ema9 < ema21 && rsi < 50) {
+            signal = "SELL ⚠️";
+            reason = "EMA breakdown + RSI bearish";
+        }
+    } else {
+        const avg = prices.slice(-50).reduce((a,b)=>a+b,0)/50;
+
+        if (currentPrice > avg) {
+            signal = "BUY";
+            reason = "Above 50-day average (uptrend)";
+        } else if (currentPrice < avg) {
+            signal = "SELL";
+            reason = "Below 50-day average (downtrend)";
+        }
+    }
+
+    document.getElementById('result').style.display = 'block';
+    document.getElementById('stockName').innerText = stock;
+    document.getElementById('price').innerText = `Price: ${currentPrice.toFixed(2)}`;
+    document.getElementById('signal').innerText = `Signal: ${signal}`;
+    document.getElementById('reason').innerText = reason;
+}
+</script>
+</body>
+</html>
