@@ -8,14 +8,12 @@
 <style>
 body { font-family: Arial, sans-serif; background:#000; color:#fff; margin:0; padding:20px; }
 .container { max-width:800px; margin:auto; }
-h1 { font-size:28px; margin-bottom:20px; }
 input, button, select { width:100%; padding:12px; margin:10px 0; border:none; }
 input, select { background:#111; color:#fff; }
 button { background:#fff; color:#000; cursor:pointer; }
 .card { border:1px solid #333; padding:15px; margin-top:20px; }
 .small { color:#aaa; font-size:14px; }
-.badge { font-weight:bold; }
-canvas { background:#111; margin-top:10px; }
+canvas { background:#111; }
 li { cursor:pointer; }
 </style>
 </head>
@@ -24,50 +22,78 @@ li { cursor:pointer; }
 <h1>AI Stock Assistant Pro</h1>
 
 <input type="text" id="stockInput" placeholder="Enter stock (e.g. RELIANCE.NS)">
-
 <select id="mode">
-<option value="scalp">Scalping (5min)</option>
-<option value="swing">Long Term (50MA)</option>
+<option value="scalp">Scalping</option>
+<option value="swing">Long Term</option>
 </select>
-
 <button onclick="analyzeStock()">Analyze</button>
 
 <div id="result" class="card" style="display:none;">
 <h2 id="stockName"></h2>
 <p id="price"></p>
-<p id="signal" class="badge"></p>
-<p class="small" id="reason"></p>
+<p id="signal"></p>
+<p id="reason" class="small"></p>
 <canvas id="chart" height="200"></canvas>
 </div>
 
 <div class="card">
-<h3>Suggested Stocks</h3>
-<ul>
-<li onclick="quickFill('RELIANCE.NS')">RELIANCE.NS</li>
-<li onclick="quickFill('TCS.NS')">TCS.NS</li>
-<li onclick="quickFill('INFY.NS')">INFY.NS</li>
-<li onclick="quickFill('HDFCBANK.NS')">HDFCBANK.NS</li>
-<li onclick="quickFill('ICICIBANK.NS')">ICICIBANK.NS</li>
-</ul>
+<h3>Trending Suggestions (Auto Refresh)</h3>
+<ul id="suggestions"></ul>
 </div>
 
 <div class="card">
-<h3>Stocks I Would Watch / Invest</h3>
-<ul id="watchlist">
-<li>RELIANCE.NS (Strong Trend)</li>
-<li>HDFCBANK.NS (Stable)</li>
-<li>INFY.NS (Tech Momentum)</li>
-</ul>
-<p class="small">These are generally strong stocks for consistency</p>
+<h3>Your Search History</h3>
+<ul id="history"></ul>
 </div>
 
 </div>
 
 <script>
 let chart;
+const proxy = "https://corsproxy.io/?";
+
+const defaultStocks = [
+"RELIANCE.NS","TCS.NS","INFY.NS","HDFCBANK.NS","ICICIBANK.NS"
+];
+
+function updateSuggestions() {
+    const list = document.getElementById("suggestions");
+    list.innerHTML = "";
+    defaultStocks.sort(() => 0.5 - Math.random());
+    defaultStocks.slice(0,5).forEach(stock => {
+        const li = document.createElement("li");
+        li.innerText = stock;
+        li.onclick = () => quickFill(stock);
+        list.appendChild(li);
+    });
+}
+
+setInterval(updateSuggestions, 10000);
+updateSuggestions();
+
+function saveHistory(stock) {
+    let history = JSON.parse(localStorage.getItem("stocks") || "[]");
+    if (!history.includes(stock)) {
+        history.unshift(stock);
+        localStorage.setItem("stocks", JSON.stringify(history.slice(0,5)));
+    }
+    renderHistory();
+}
+
+function renderHistory() {
+    const history = JSON.parse(localStorage.getItem("stocks") || "[]");
+    const list = document.getElementById("history");
+    list.innerHTML = "";
+    history.forEach(stock => {
+        const li = document.createElement("li");
+        li.innerText = stock;
+        li.onclick = () => quickFill(stock);
+        list.appendChild(li);
+    });
+}
 
 function quickFill(stock) {
-    document.getElementById('stockInput').value = stock;
+    document.getElementById("stockInput").value = stock;
     analyzeStock();
 }
 
@@ -92,13 +118,15 @@ function calculateRSI(prices, period = 14) {
 }
 
 async function analyzeStock() {
-    const stock = document.getElementById('stockInput').value;
-    const mode = document.getElementById('mode').value;
+    const stock = document.getElementById("stockInput").value;
+    const mode = document.getElementById("mode").value;
     if (!stock) return;
+
+    saveHistory(stock);
 
     const interval = mode === 'scalp' ? '5m' : '1d';
 
-    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${stock}?interval=${interval}`);
+    const res = await fetch(proxy + `https://query1.finance.yahoo.com/v8/finance/chart/${stock}?interval=${interval}`);
     const data = await res.json();
 
     const prices = data.chart.result[0].indicators.quote[0].close.filter(p => p);
@@ -114,51 +142,44 @@ async function analyzeStock() {
 
         if (ema9 > ema21 && rsi > 50) {
             signal = "BUY ⚡";
-            reason = "EMA crossover + RSI bullish";
+            reason = "Momentum strong";
         } else if (ema9 < ema21 && rsi < 50) {
             signal = "SELL ⚠️";
-            reason = "EMA breakdown + RSI bearish";
+            reason = "Momentum weak";
         }
     } else {
         const avg = prices.slice(-50).reduce((a,b)=>a+b,0)/50;
-
         if (currentPrice > avg) {
             signal = "BUY";
-            reason = "Above 50-day average (uptrend)";
-        } else if (currentPrice < avg) {
+            reason = "Uptrend";
+        } else {
             signal = "SELL";
-            reason = "Below 50-day average (downtrend)";
+            reason = "Downtrend";
         }
     }
 
-    document.getElementById('result').style.display = 'block';
-    document.getElementById('stockName').innerText = stock;
-    document.getElementById('price').innerText = `Price: ${currentPrice.toFixed(2)}`;
-    document.getElementById('signal').innerText = `Signal: ${signal}`;
-    document.getElementById('reason').innerText = reason;
+    document.getElementById("result").style.display = 'block';
+    document.getElementById("stockName").innerText = stock;
+    document.getElementById("price").innerText = `Price: ${currentPrice.toFixed(2)}`;
+    document.getElementById("signal").innerText = `Signal: ${signal}`;
+    document.getElementById("reason").innerText = reason;
 
-    // Chart
-    const ctx = document.getElementById('chart').getContext('2d');
+    const ctx = document.getElementById("chart").getContext("2d");
     if (chart) chart.destroy();
     chart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: prices.map((_, i) => i),
-            datasets: [{
-                label: stock,
-                data: prices,
-                borderColor: 'white',
-                borderWidth: 1,
-                pointRadius: 0
-            }]
+            datasets: [{ data: prices, borderWidth:1, pointRadius:0 }]
         },
         options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { x: { display: false }, y: { display: true } }
+            plugins:{legend:{display:false}},
+            scales:{x:{display:false}}
         }
     });
 }
+
+renderHistory();
 </script>
 </body>
 </html>
