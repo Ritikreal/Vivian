@@ -3,81 +3,103 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Login - Transformer Monitor</title>
-
-<style>
-body {
-  margin: 0;
-  font-family: 'Segoe UI';
-  background: linear-gradient(135deg, #020617, #0f172a);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  color: white;
-}
-
-.card {
-  background: #020617;
-  padding: 30px;
-  border-radius: 16px;
-  width: 320px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-}
-
-h2 { margin-bottom: 5px; }
-p { color: #94a3b8; font-size: 13px; }
-
-input {
-  width: 100%;
-  padding: 12px;
-  margin: 10px 0;
-  border-radius: 10px;
-  border: 1px solid #1e293b;
-  background: #0f172a;
-  color: white;
-}
-
-button {
-  width: 100%;
-  padding: 12px;
-  border: none;
-  border-radius: 10px;
-  background: #3b82f6;
-  color: white;
-  cursor: pointer;
-}
-
-.error { color: red; font-size: 12px; }
-</style>
+<title>Transformer Dashboard</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
 
-<div class="card">
-  <h2>⚡ Transformer Monitor</h2>
-  <p>Secure Login</p>
-
-  <input id="user" placeholder="Username">
-  <input id="pass" type="password" placeholder="Password">
-
-  <button onclick="login()">Login</button>
-  <p id="error" class="error"></p>
+<!-- LOCK SCREEN -->
+<div id="lockScreen" class="lock">
+  <div class="lock-card">
+    <h2>⚡ Transformer System</h2>
+    <p>Secure Access</p>
+    <input id="pass" placeholder="Enter Password">
+    <button onclick="unlock()">Unlock</button>
+  </div>
 </div>
 
-<script>
-function login() {
-  const u = document.getElementById("user").value;
-  const p = document.getElementById("pass").value;
+<!-- APP -->
+<div id="app" class="hidden">
 
-  if (u === "admin" && p === "1234") {
-    localStorage.setItem("loggedIn", "true");
-    window.location.href = "dashboard.html";
-  } else {
-    document.getElementById("error").innerText = "Invalid credentials";
-  }
-}
-</script>
+<header>
+  <h2>TRANSFORMER HEALTH DASHBOARD</h2>
+  <span class="status">● Operational</span>
+</header>
 
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside>
+    <h3>Menu</h3>
+    <ul>
+      <li onclick="show('dashboard')">Dashboard</li>
+      <li onclick="show('analytics')">Analytics</li>
+      <li onclick="show('settings')">Settings</li>
+    </ul>
+  </aside>
+
+  <!-- MAIN -->
+  <main id="dashboard">
+
+    <div class="grid">
+
+      <div class="card large">
+        <h3>System Overview</h3>
+        <canvas id="mainChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h3>Temperature</h3>
+        <div class="value" id="temp"></div>
+        <canvas class="mini" id="tempChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h3>Voltage</h3>
+        <div class="value" id="volt"></div>
+        <canvas class="mini" id="voltChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h3>Current</h3>
+        <div class="value" id="curr"></div>
+        <canvas class="mini" id="currChart"></canvas>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ANALYTICS -->
+  <section id="analytics" class="hidden">
+    <h2>Analytics</h2>
+    <canvas id="analyticsChart"></canvas>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="settings" class="hidden">
+    <h2>Settings</h2>
+
+    <div class="card">
+      <label>Max Temp</label>
+      <input id="maxTemp" value="80">
+      
+      <label>Max Voltage</label>
+      <input id="maxVolt" value="250">
+
+      <label>Max Current</label>
+      <input id="maxCurr" value="15">
+
+      <button onclick="saveSettings()">Save</button>
+    </div>
+  </section>
+
+</div>
+
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>
