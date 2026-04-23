@@ -1,7 +1,7 @@
 body {
   margin: 0;
   font-family: 'Segoe UI';
-  background: radial-gradient(circle at top, #0f172a, #020617);
+  background: #070c18;
   color: white;
 }
 
@@ -18,27 +18,7 @@ body {
 .lock-card {
   background: #020617;
   padding: 30px;
-  border-radius: 16px;
-  box-shadow: 0 0 40px rgba(0,0,0,0.6);
-}
-
-input {
-  width: 100%;
-  padding: 10px;
-  margin: 10px 0;
-  background: #0f172a;
-  border: none;
-  border-radius: 8px;
-  color: white;
-}
-
-button {
-  padding: 10px;
-  background: linear-gradient(90deg, #3b82f6, #06b6d4);
-  border: none;
-  border-radius: 8px;
-  color: white;
-  cursor: pointer;
+  border-radius: 12px;
 }
 
 /* HEADER */
@@ -49,15 +29,10 @@ header {
   background: #020617;
 }
 
-.status {
-  color: #22c55e;
-}
-
 /* LAYOUT */
 .layout {
   display: grid;
   grid-template-columns: 200px 1fr;
-  height: calc(100vh - 60px);
 }
 
 /* SIDEBAR */
@@ -69,7 +44,6 @@ aside {
 aside li {
   margin: 10px 0;
   cursor: pointer;
-  color: #94a3b8;
 }
 
 /* GRID */
@@ -81,26 +55,15 @@ aside li {
 }
 
 .card {
-  background: rgba(15,23,42,0.8);
-  backdrop-filter: blur(10px);
+  background: #0f172a;
   padding: 20px;
-  border-radius: 12px;
-  transition: 0.3s;
-}
-
-.card:hover {
-  transform: scale(1.03);
+  border-radius: 10px;
 }
 
 .large {
   grid-column: span 2;
 }
 
-.value {
-  font-size: 24px;
-  margin: 10px 0;
-}
-
-canvas.mini {
-  height: 60px !important;
+canvas {
+  max-height: 200px;
 }
