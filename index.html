@@ -1,154 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Transformer Monitoring Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
-    }
-    header {
-      padding: 20px;
-      text-align: center;
-      font-size: 24px;
-      font-weight: bold;
-      background: #020617;
-      border-bottom: 1px solid #1e293b;
-    }
-    .container {
-      padding: 20px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
-    }
-    .card {
-      background: #020617;
-      padding: 20px;
-      border-radius: 16px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    }
-    .value {
-      font-size: 28px;
-      margin-top: 10px;
-    }
-    .status {
-      margin-top: 10px;
-      font-weight: bold;
-    }
-    canvas {
-      margin-top: 20px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformer Monitoring Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body{margin:0;font-family:Segoe UI;background:#0b1220;color:#e2e8f0}
+header{padding:15px;text-align:center;font-size:22px;background:#020617;border-bottom:1px solid #1e293b}
+.container{padding:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.card{background:#020617;padding:20px;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,.4)}
+.value{font-size:28px;font-weight:bold}
+.status{font-size:14px;margin-top:5px}
+.extra{font-size:12px;color:#94a3b8}
+.hidden{display:none}
+input{padding:10px;border-radius:8px;border:none;width:100%;margin:10px 0}
+button{padding:10px;border:none;border-radius:8px;background:#2563eb;color:white;cursor:pointer}
+nav{display:flex;gap:10px;justify-content:center;margin:10px}
+</style>
 </head>
 <body>
-  <header>⚡ Transformer IoT Monitoring Dashboard</header>
 
-  <div class="container">
-    <div class="card">
-      <h3>Temperature (°C)</h3>
-      <div class="value" id="temp">--</div>
-      <div class="status" id="tempStatus"></div>
-    </div>
+<!-- LOGIN -->
+<div id="loginPage" class="container">
+<div class="card" style="max-width:400px;margin:auto">
+<h2>Login</h2>
+<input id="user" placeholder="Username">
+<input id="pass" type="password" placeholder="Password">
+<button onclick="login()">Login</button>
+<p id="loginMsg"></p>
+</div>
+</div>
 
-    <div class="card">
-      <h3>Voltage (V)</h3>
-      <div class="value" id="volt">--</div>
-      <div class="status" id="voltStatus"></div>
-    </div>
+<!-- DASHBOARD -->
+<div id="dashboard" class="hidden">
+<header>⚡ Transformer Monitoring Dashboard</header>
+<nav>
+<button onclick="show('dashboardView')">Dashboard</button>
+<button onclick="show('settingsView')">Settings</button>
+</nav>
 
-    <div class="card">
-      <h3>Current (A)</h3>
-      <div class="value" id="curr">--</div>
-      <div class="status" id="currStatus"></div>
-    </div>
+<div id="dashboardView" class="container">
+<div class="card"><h3>Temperature</h3><div id="temp" class="value"></div><div id="tempStatus" class="status"></div></div>
+<div class="card"><h3>Voltage</h3><div id="volt" class="value"></div><div id="voltStatus" class="status"></div></div>
+<div class="card"><h3>Current</h3><div id="curr" class="value"></div><div id="currStatus" class="status"></div></div>
+<div class="card" style="grid-column: span 2;"><canvas id="chart"></canvas></div>
+</div>
 
-    <div class="card" style="grid-column: span 2;">
-      <h3>Live Data Graph</h3>
-      <canvas id="chart"></canvas>
-    </div>
-  </div>
+<!-- SETTINGS -->
+<div id="settingsView" class="container hidden">
+<div class="card">
+<h3>Threshold Settings</h3>
+<label>Max Temperature</label>
+<input id="maxTemp" value="80">
+<label>Max Voltage</label>
+<input id="maxVolt" value="250">
+<label>Max Current</label>
+<input id="maxCurr" value="15">
+<button onclick="saveSettings()">Save</button>
+</div>
+</div>
+</div>
 
-  <script>
-    const ctx = document.getElementById('chart').getContext('2d');
+<script>
+// LOGIN
+function login(){
+const u=document.getElementById('user').value;
+const p=document.getElementById('pass').value;
+if(u==='admin'&&p==='1234'){
+document.getElementById('loginPage').classList.add('hidden');
+document.getElementById('dashboard').classList.remove('hidden');
+}else{
+document.getElementById('loginMsg').innerText='Invalid credentials';
+}}
 
-    const data = {
-      labels: [],
-      datasets: [
-        {
-          label: 'Temperature',
-          data: [],
-          borderColor: '#38bdf8',
-          tension: 0.3
-        },
-        {
-          label: 'Voltage',
-          data: [],
-          borderColor: '#22c55e',
-          tension: 0.3
-        },
-        {
-          label: 'Current',
-          data: [],
-          borderColor: '#f59e0b',
-          tension: 0.3
-        }
-      ]
-    };
+function show(view){
+document.getElementById('dashboardView').classList.add('hidden');
+document.getElementById('settingsView').classList.add('hidden');
+document.getElementById(view).classList.remove('hidden');
+}
 
-    const chart = new Chart(ctx, {
-      type: 'line',
-      data: data,
-      options: {
-        responsive: true,
-        scales: {
-          x: { ticks: { color: '#94a3b8' } },
-          y: { ticks: { color: '#94a3b8' } }
-        },
-        plugins: {
-          legend: {
-            labels: { color: '#e2e8f0' }
-          }
-        }
-      }
-    });
+// SETTINGS
+let settings={maxTemp:80,maxVolt:250,maxCurr:15};
+function saveSettings(){
+settings.maxTemp=parseFloat(document.getElementById('maxTemp').value);
+settings.maxVolt=parseFloat(document.getElementById('maxVolt').value);
+settings.maxCurr=parseFloat(document.getElementById('maxCurr').value);
+alert('Saved');
+}
 
-    function getRandom(min, max) {
-      return (Math.random() * (max - min) + min).toFixed(2);
-    }
+// CHART
+const ctx=document.getElementById('chart').getContext('2d');
+const data={labels:[],datasets:[{label:'Temp',data:[],borderColor:'#38bdf8'},{label:'Volt',data:[],borderColor:'#22c55e'},{label:'Curr',data:[],borderColor:'#f59e0b'}]};
+const chart=new Chart(ctx,{type:'line',data:data,options:{responsive:true}});
 
-    function updateData() {
-      const temp = getRandom(40, 100);
-      const volt = getRandom(210, 260);
-      const curr = getRandom(5, 20);
+// SMOOTH VALUES
+let temp=65,volt=230,curr=10;
+function fluctuate(val,range){
+return val + (Math.random()*range - range/2);
+}
 
-      document.getElementById('temp').innerText = temp;
-      document.getElementById('volt').innerText = volt;
-      document.getElementById('curr').innerText = curr;
+function update(){
+temp=fluctuate(temp,2);
+volt=fluctuate(volt,3);
+curr=fluctuate(curr,1);
 
-      document.getElementById('tempStatus').innerText = temp > 80 ? '⚠️ High Temperature' : 'Normal';
-      document.getElementById('voltStatus').innerText = volt > 250 ? '⚠️ Over Voltage' : 'Normal';
-      document.getElementById('currStatus').innerText = curr > 15 ? '⚠️ Overload' : 'Normal';
+document.getElementById('temp').innerText=temp.toFixed(1);
+document.getElementById('volt').innerText=volt.toFixed(1);
+document.getElementById('curr').innerText=curr.toFixed(1);
 
-      const time = new Date().toLocaleTimeString();
-      data.labels.push(time);
-      data.datasets[0].data.push(temp);
-      data.datasets[1].data.push(volt);
-      data.datasets[2].data.push(curr);
+document.getElementById('tempStatus').innerText=temp>settings.maxTemp?'⚠️ High':'Normal';
+document.getElementById('voltStatus').innerText=volt>settings.maxVolt?'⚠️ High':'Normal';
+document.getElementById('currStatus').innerText=curr>settings.maxCurr?'⚠️ High':'Normal';
 
-      if (data.labels.length > 10) {
-        data.labels.shift();
-        data.datasets.forEach(d => d.data.shift());
-      }
+let t=new Date().toLocaleTimeString();
+data.labels.push(t);
+data.datasets[0].data.push(temp);
+data.datasets[1].data.push(volt);
+data.datasets[2].data.push(curr);
 
-      chart.update();
-    }
-
-    setInterval(updateData, 2000);
-  </script>
+if(data.labels.length>15){data.labels.shift();data.datasets.forEach(d=>d.data.shift());}
+chart.update();
+}
+setInterval(update,2000);
+</script>
 </body>
 </html>
